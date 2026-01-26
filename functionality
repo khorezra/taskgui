@@ -1,0 +1,179 @@
+import tkinter as tk
+from tkinter import messagebox
+import calendar
+import json  # NEW: For saving data
+import os    # NEW: For checking if file exists
+from datetime import datetime
+
+class TaskCalendarApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("My Calendar Task System (With Save)")
+        self.root.geometry("700x450")
+
+        # --- DATA STORAGE ---
+        self.data_file = "tasks.json"
+        self.tasks = self.load_data()  # NEW: Load from file on startup
+        
+        # Track the currently selected date (Default to today)
+        now = datetime.now()
+        self.current_year = now.year
+        self.current_month = now.month
+        self.selected_date_key = f"{self.current_year}-{self.current_month}-{now.day}"
+
+        # --- GUI LAYOUT ---
+        # Split window into two sides
+        self.cal_frame = tk.Frame(root, padx=10, pady=10)
+        self.cal_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.task_frame = tk.Frame(root, bg="#f0f0f0", padx=10, pady=10)
+        self.task_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # --- CALENDAR SIDE (LEFT) ---
+        self.month_label = tk.Label(self.cal_frame, text="", font=("Arial", 14, "bold"))
+        self.month_label.pack(pady=5)
+        
+        # Navigation Buttons (NEW)
+        nav_frame = tk.Frame(self.cal_frame)
+        nav_frame.pack(pady=5)
+        tk.Button(nav_frame, text="< Prev", command=self.prev_month).pack(side=tk.LEFT, padx=5)
+        tk.Button(nav_frame, text="Next >", command=self.next_month).pack(side=tk.LEFT, padx=5)
+
+        # Grid to hold day buttons
+        self.cal_grid = tk.Frame(self.cal_frame)
+        self.cal_grid.pack(pady=10)
+        
+        self.draw_calendar()
+
+        # --- TASK SIDE (RIGHT) ---
+        self.header_label = tk.Label(self.task_frame, text="Tasks", font=("Arial", 12, "bold"), bg="#f0f0f0")
+        self.header_label.pack(pady=5)
+
+        self.date_display = tk.Label(self.task_frame, text=f"Date: {self.selected_date_key}", bg="#f0f0f0")
+        self.date_display.pack()
+
+        # The Listbox showing tasks
+        self.task_listbox = tk.Listbox(self.task_frame, height=12)
+        self.task_listbox.pack(fill=tk.X, pady=5)
+        
+        # Delete Button (NEW)
+        btn_del = tk.Button(self.task_frame, text="Delete Selected", command=self.delete_task, bg="#FF5722", fg="white")
+        btn_del.pack(fill=tk.X, pady=2)
+
+        # Input to add new task
+        self.task_entry = tk.Entry(self.task_frame)
+        self.task_entry.pack(fill=tk.X, pady=5)
+        self.task_entry.bind('<Return>', lambda event: self.add_task())
+
+        btn_add = tk.Button(self.task_frame, text="Add Task", command=self.add_task, bg="#4CAF50", fg="white")
+        btn_add.pack(fill=tk.X)
+
+        self.refresh_task_list()
+
+    # --- NEW: SAVE/LOAD LOGIC ---
+    def load_data(self):
+        if os.path.exists(self.data_file):
+            try:
+                with open(self.data_file, "r") as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
+
+    def save_data(self):
+        with open(self.data_file, "w") as f:
+            json.dump(self.tasks, f)
+
+    # --- CALENDAR LOGIC ---
+    def draw_calendar(self):
+        for widget in self.cal_grid.winfo_children():
+            widget.destroy()
+
+        month_name = calendar.month_name[self.current_month]
+        self.month_label.config(text=f"{month_name} {self.current_year}")
+
+        cal = calendar.monthcalendar(self.current_year, self.current_month)
+        days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+        
+        for idx, day in enumerate(days):
+            lbl = tk.Label(self.cal_grid, text=day, font=("Arial", 8, "bold"))
+            lbl.grid(row=0, column=idx, padx=2, pady=2)
+
+        for r, week in enumerate(cal):
+            for c, day in enumerate(week):
+                if day != 0:
+                    date_key = f"{self.current_year}-{self.current_month}-{day}"
+                    
+                    # NEW: Check if this day has tasks
+                    btn_color = "SystemButtonFace" # Default gray
+                    if date_key in self.tasks and self.tasks[date_key]: 
+                        btn_color = "#ADD8E6" # Light Blue if busy
+
+                    btn = tk.Button(
+                        self.cal_grid, 
+                        text=str(day), 
+                        width=4, 
+                        bg=btn_color, # Apply color
+                        command=lambda d=day: self.select_date(d)
+                    )
+                    btn.grid(row=r+1, column=c, padx=2, pady=2)
+
+    def prev_month(self):
+        self.current_month -= 1
+        if self.current_month == 0:
+            self.current_month = 12
+            self.current_year -= 1
+        self.draw_calendar()
+
+    def next_month(self):
+        self.current_month += 1
+        if self.current_month == 13:
+            self.current_month = 1
+            self.current_year += 1
+        self.draw_calendar()
+
+    def select_date(self, day):
+        self.selected_date_key = f"{self.current_year}-{self.current_month}-{day}"
+        self.date_display.config(text=f"Date: {self.selected_date_key}")
+        self.refresh_task_list()
+
+    def add_task(self):
+        task_text = self.task_entry.get()
+        if task_text:
+            if self.selected_date_key not in self.tasks:
+                self.tasks[self.selected_date_key] = []
+            
+            self.tasks[self.selected_date_key].append(task_text)
+            self.save_data()  # Save immediately
+            
+            self.task_entry.delete(0, tk.END)
+            self.refresh_task_list()
+            self.draw_calendar() # Redraw to show blue color
+
+    def delete_task(self):
+        try:
+            selection = self.task_listbox.curselection()
+            if selection:
+                index = selection[0]
+                del self.tasks[self.selected_date_key][index]
+                
+                # If list is empty, delete the key so color goes back to gray
+                if not self.tasks[self.selected_date_key]:
+                    del self.tasks[self.selected_date_key]
+                
+                self.save_data()
+                self.refresh_task_list()
+                self.draw_calendar()
+        except Exception:
+            pass
+
+    def refresh_task_list(self):
+        self.task_listbox.delete(0, tk.END)
+        day_tasks = self.tasks.get(self.selected_date_key, [])
+        for task in day_tasks:
+            self.task_listbox.insert(tk.END, task)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = TaskCalendarApp(root)
+    root.mainloop()
