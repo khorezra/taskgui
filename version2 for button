@@ -1,0 +1,279 @@
+import tkinter
+from tkinter import ttk
+from tkinter import messagebox
+import json
+
+tasks = []
+
+def add_task(title, note=""):
+    task = {"title": title, "note": note, "done": False}
+    tasks.append(task)
+    print("Task added:", title)
+
+def edit_task(index, new_title, new_note=""):
+    if 0 <= index < len(tasks):
+        tasks[index]["title"] = new_title
+        tasks[index]["note"] = new_note
+        print("Task", index+1, "edited.")
+    else:
+        print("Error: Task not found.")
+
+def delete_task(index):
+    if 0 <= index < len(tasks):
+        removed = tasks.pop(index)
+        print("Task deleted:", removed["title"])
+    else:
+        print("Error: Task not found.")
+
+def mark_done(index):
+    if 0 <= index < len(tasks):
+        tasks[index]["done"] = True
+        print("Task done:", tasks[index]["title"])
+    else:
+        print("Error: Task not found.")
+
+def refresh_treeview():
+    for row in tree.get_children():
+        tree.delete(row)
+    if len(tasks) == 0:
+        tree.insert("", "end", values=("No tasks yet.", "", "", ""))
+        status_label.config(text="No tasks yet.")
+        return
+    for i, t in enumerate(tasks):
+        status = "Done" if t["done"] else "Not Done"
+        tree.insert("", "end", values=(i+1, t["title"], t["note"], status))
+
+def show_tasks():
+    refresh_treeview()
+
+def show_done_tasks():
+    for row in tree.get_children():
+        tree.delete(row)
+    found = False
+    for i, t in enumerate(tasks):
+        if t["done"]:
+            tree.insert("", "end", values=(i+1, t["title"], t["note"], "Done"))
+            found = True
+    if not found:
+        tree.insert("", "end", values=("No done tasks.", "", "", ""))
+        status_label.config(text="No done tasks found.")
+    else:
+        status_label.config(text="Showing done tasks.")
+
+def show_not_done_tasks():
+    for row in tree.get_children():
+        tree.delete(row)
+    found = False
+    for i, t in enumerate(tasks):
+        if not t["done"]:
+            tree.insert("", "end", values=(i+1, t["title"], t["note"], "Not Done"))
+            found = True
+    if not found:
+        tree.insert("", "end", values=("All tasks done.", "", "", ""))
+        status_label.config(text="All tasks are done.")
+    else:
+        status_label.config(text="Showing not done tasks.")
+
+def search_task():
+    query = search_entry.get().lower()
+    for row in tree.get_children():
+        tree.delete(row)
+    found = False
+    for i, t in enumerate(tasks):
+        if query in t["title"].lower() or query in t["note"].lower():
+            status = "Done" if t["done"] else "Not Done"
+            tree.insert("", "end", values=(i+1, t["title"], t["note"], status))
+            found = True
+    if not found:
+        tree.insert("", "end", values=("No tasks found.", "", "", ""))
+        status_label.config(text=f"No tasks match '{query}'")
+    else:
+        status_label.config(text=f"Showing tasks matching '{query}'")
+
+def gui_add_task():
+    t = title_entry.get()
+    n = note_entry.get()
+    if t == "":
+        messagebox.showwarning("Error", "Title is required!")
+        return
+    add_task(t, n)
+    save_tasks()
+    refresh_treeview()
+    status_label.config(text=f"Task '{t}' added.")
+
+def gui_edit_task():
+    i = index_entry.get()
+    t = title_entry.get()
+    n = note_entry.get()
+    if i == "" or t == "":
+        messagebox.showwarning("Error", "Index and title required!")
+        return
+    try:
+        idx = int(i) - 1
+        edit_task(idx, t, n)
+        refresh_treeview()
+        status_label.config(text=f"Task {i} edited.")
+    except:
+        status_label.config(text="Something went wrong. Check index.")
+
+def gui_mark_done():
+    i = index_entry.get()
+    if i == "":
+        messagebox.showwarning("Error", "Index required!")
+        return
+    try:
+        idx = int(i) - 1
+        mark_done(idx)
+        refresh_treeview()
+        status_label.config(text=f"Task {i} marked as done.")
+    except:
+        status_label.config(text="Something went wrong. Check index.")
+
+def save_tasks():
+    try:
+        with open("tasks.json", "w") as f:
+            json.dump(tasks, f)
+        status_label.config(text="Tasks saved successfully.")
+    except:
+        messagebox.showerror("Error", "Could not save tasks.")
+
+def load_tasks():
+    global tasks
+    try:
+        with open("tasks.json", "r") as f:
+            tasks = json.load(f)
+        refresh_treeview()
+        status_label.config(text="Tasks loaded successfully.")
+    except FileNotFoundError:
+        tasks = []
+        for row in tree.get_children():
+            tree.delete(row)
+        tree.insert("", "end", values=("No saved tasks found.", "", "", ""))
+        status_label.config(text="No saved tasks found.")
+    except:
+        messagebox.showerror("Error", "Could not load tasks.")
+
+def clear_inputs():
+    title_entry.delete(0, tkinter.END)
+    note_entry.delete(0, tkinter.END)
+    index_entry.delete(0, tkinter.END)
+
+def is_duplicate(title):
+    for t in tasks:
+        if t["title"].lower() == title.lower():
+            return True
+    return False
+
+def gui_add_task_safe():
+    t = title_entry.get()
+    n = note_entry.get()
+    if t == "":
+        messagebox.showwarning("Error", "Title is required!")
+        return
+    if is_duplicate(t):
+        messagebox.showwarning("Duplicate", "Task already exists.")
+        return
+    add_task(t, n)
+    save_tasks()
+    refresh_treeview()
+    clear_inputs()
+    status_label.config(text=f"Task '{t}' added.")
+
+def gui_delete_task_confirm():
+    i = index_entry.get()
+    if i == "":
+        messagebox.showwarning("Error", "Index required!")
+        return
+    try:
+        idx = int(i) - 1
+        confirm = messagebox.askyesno("Confirm", "Delete this task?")
+        if confirm:
+            delete_task(idx)
+            refresh_treeview()
+            clear_inputs()
+            status_label.config(text=f"Task {i} deleted.")
+    except:
+        status_label.config(text="Something went wrong. Check index.")
+
+root = tkinter.Tk()
+root.title("TaskEase")
+
+tkinter.Label(root, text="Task Title").grid(row=0, column=0)
+title_entry = tkinter.Entry(root)
+title_entry.grid(row=1, column=0)
+
+tkinter.Label(root, text="Task Note").grid(row=0, column=1)
+note_entry = tkinter.Entry(root)
+note_entry.grid(row=1, column=1)
+
+tkinter.Label(root, text="Task Index").grid(row=2, column=0, columnspan=2)
+index_entry = tkinter.Entry(root)
+index_entry.grid(row=3, column=0, columnspan=2)
+
+tkinter.Button(root, text="Add Task", command=gui_add_task_safe).grid(row=4, column=0, sticky="we")
+tkinter.Button(root, text="Show Tasks", command=show_tasks).grid(row=4, column=1, sticky="we")
+tkinter.Button(root, text="Edit Task", command=gui_edit_task).grid(row=5, column=0, sticky="we")
+tkinter.Button(root, text="Delete Task", command=gui_delete_task_confirm).grid(row=5, column=1, sticky="we")
+tkinter.Button(root, text="Mark Done", command=gui_mark_done).grid(row=6, column=0, columnspan=2, sticky="we")
+tkinter.Button(root, text="Show Done Tasks", command=show_done_tasks).grid(row=7, column=0, sticky="we")
+tkinter.Button(root, text="Show Not Done Tasks", command=show_not_done_tasks).grid(row=7, column=1, sticky="we")
+tkinter.Button(root, text="Save Tasks", command=save_tasks).grid(row=8, column=0, sticky="we")
+tkinter.Button(root, text="Load Tasks", command=load_tasks).grid(row=8, column=1, sticky="we")
+
+tkinter.Label(root, text="Search Task").grid(row=9, column=0)
+search_entry = tkinter.Entry(root)
+search_entry.grid(row=10, column=0, columnspan=2, sticky="we")
+tkinter.Button(root, text="Search", command=search_task).grid(row=10, column=1, sticky="we")
+
+tree = ttk.Treeview(root, columns=("Index", "Title", "Note", "Status"), show="headings", height=10)
+tree.heading("Index", text="No.")
+tree.heading("Title", text="Title")
+tree.heading("Note", text="Note")
+tree.heading("Status", text="Status")
+tree.column("Index", width=40)
+tree.column("Title", width=120)
+tree.column("Note", width=150)
+tree.column("Status", width=80)
+tree.grid(row=11, column=0, columnspan=2)
+
+scrollbar = tkinter.Scrollbar(root, orient="vertical", command=tree.yview)
+scrollbar.grid(row=11, column=2, sticky="ns")
+tree.config(yscrollcommand=scrollbar.set)
+
+status_label = tkinter.Label(root, text="", fg="green")
+status_label.grid(row=12, column=0, columnspan=2)
+
+load_tasks()
+
+def get_task_statistics():
+    total = len(tasks)
+    done = 0
+    not_done = 0
+    for t in tasks:
+        if t["done"]:
+            done += 1
+        else:
+            not_done += 1
+    return f"Total: {total} | Done: {done} | Not Done: {not_done}"
+
+def show_task_statistics():
+    stats = get_task_statistics()
+    status_label.config(text=stats)
+
+tkinter.Button(root, text="Task Statistics", command=show_task_statistics).grid(row=13, column=0, columnspan=2, sticky="we")
+
+def fill_index_from_tree(event):
+    try:
+        selected = tree.selection()
+        if selected:
+            item = tree.item(selected)
+            values = item["values"]
+            if len(values) > 0:
+                index_entry.delete(0, tkinter.END)
+                index_entry.insert(0, str(values[0]))
+    except:
+        pass
+
+tree.bind("<<TreeviewSelect>>", fill_index_from_tree)
+
+root.mainloop()
