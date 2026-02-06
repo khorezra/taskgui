@@ -1,0 +1,65 @@
+# Task Ease - App Style Task Manager
+# GUI version using Tkinter
+
+import tkinter as tk
+from tkinter import messagebox
+import json
+
+tasks = []
+
+def add_task():
+    task = task_entry.get()
+    if task == "":
+        messagebox.showwarning("Warning", "Task cannot be empty")
+        return
+    tasks.append(task)
+    task_listbox.insert(tk.END, task)
+    task_entry.delete(0, tk.END)
+
+def delete_task():
+    try:
+        index = task_listbox.curselection()[0]
+        task_listbox.delete(index)
+        tasks.pop(index)
+    except:
+        messagebox.showwarning("Warning", "Select a task to delete")
+
+def complete_task():
+    try:
+        index = task_listbox.curselection()[0]
+        task = tasks[index]
+        tasks[index] = f"✔ {task}"
+        task_listbox.delete(index)
+        task_listbox.insert(index, tasks[index])
+    except:
+        messagebox.showwarning("Warning", "Select a task to complete")
+
+# App window
+app = tk.Tk()
+app.title("Task Ease")
+app.geometry("400x450")
+
+# Title
+title = tk.Label(app, text="Task Ease", font=("Arial", 20, "bold"), bg="#f4f4f4")
+title.pack(pady=10)
+
+# Input field
+task_entry = tk.Entry(app, font=("Arial", 12), width=30)
+task_entry.pack(pady=10)
+
+# Buttons
+add_btn = tk.Button(app, text="Add Task", width=15, command=add_task)
+add_btn.pack(pady=5)
+
+complete_btn = tk.Button(app, text="Complete Task", width=15, command=complete_task)
+complete_btn.pack(pady=5)
+delete_btn = tk.Button(app, text="Delete Task", width=15, command=delete_task)
+delete_btn.pack(pady=5)
+
+# Task list
+task_listbox = tk.Listbox(app, font=("Arial", 12), width=35, height=10)
+task_listbox.pack(pady=15)
+
+# Run app
+app.mainloop()
+
